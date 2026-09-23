@@ -1,0 +1,42 @@
+[project]
+name = "cacm-demo-google-genai-vertex"
+version = "0.1.0"
+description = "Harness SDK + Google Gen AI (Vertex AI) tracing demo (support-ticket triage)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "harness-sdk[google-genai]>=1.0.7",
+    # harness-sdk[google-genai] already depends on this transitively, but
+    # it's pinned explicitly here (same reasoning as anthropic/'s explicit
+    # anthropic>=0.40.0 pin) because main.py imports google.genai directly
+    # -- this demo's lockfile should control that version, not just
+    # whatever the extra happens to resolve. The floor is 1.55.0, not
+    # harness-sdk's own >=1.0.0: this app's CI-only mock path (see
+    # main.py's GOOGLE_GENAI_BASE_URL branch) relies on
+    # HttpOptions.base_url_resource_scope, which google-genai only
+    # introduced between 1.50.0 and 1.55.0 (verified against PyPI
+    # release history, not just the changelog's prose).
+    "google-genai>=1.55.0",
+    # harness_sdk's google_genai instrumentation module
+    # (harness_sdk/instrumentation/google_genai/) imports
+    # opentelemetry.util.genai directly, the same as anthropic/'s
+    # opentelemetry-instrumentation-anthropic does -- but unlike that
+    # package, harness-sdk[google-genai] does NOT pull this in
+    # transitively (verified: neither harness-sdk's own dependencies nor
+    # the google-genai extra declare it). Without this explicit pin,
+    # agent.instrument() fails to load the google-genai instrumentor at
+    # all when HARNESS_ENABLE_AI_GOOGLE_GENAI=true.
+    "opentelemetry-util-genai>=0.1b0",
+    # Unlike 1-harness-sdk/openai/, no explicit httpx dependency is needed
+    # here even though opentelemetry-instrumentation-openai_v2's httpx
+    # requirement (LLD §12.2) is the kind of thing that class of bug looks
+    # like: google-genai itself already depends directly on plain
+    # httpx>=0.28.1 (it never vendors a renamed copy the way openai>=2.x
+    # does), and harness_sdk's google-genai instrumentor is Harness-
+    # authored code with no separate httpx dependency of its own.
+    #
+    # main.py reads TRACE_TARGET / HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN /
+    # GOOGLE_CLOUD_* / GOOGLE_GENAI_* from a .env file (see .env.example)
+    # -- neither uv nor Python loads .env files on its own.
+    "python-dotenv>=1.0.0",
+]

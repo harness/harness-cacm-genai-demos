@@ -1,0 +1,22 @@
+[project]
+name = "cacm-demo-manual-python"
+version = "0.1.0"
+description = "Manual OpenTelemetry instrumentation demo (support-ticket triage), no SDK/instrumentor"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Raw OTel SDK only -- no harness-sdk, no opentelemetry-instrumentation-*
+    # for any provider. This app builds the TracerProvider/exporter itself
+    # and sets every gen_ai.* attribute by hand (see main.py STEP 2/4).
+    "opentelemetry-sdk>=1.30.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.30.0",
+    # Used only to make the actual chat-completion calls the spans wrap
+    # around; unlike 1-harness-sdk/openai/, no explicit httpx pin is
+    # needed here -- there's no opentelemetry-instrumentation-openai_v2
+    # in this app to silently no-op if httpx isn't importable.
+    "openai>=2.53.0",
+    # main.py reads TRACE_TARGET / HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN /
+    # OPENAI_* from a .env file (see .env.example) -- neither uv nor Python
+    # loads .env files on its own.
+    "python-dotenv>=1.0.0",
+]

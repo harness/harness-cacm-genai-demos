@@ -1,0 +1,35 @@
+[project]
+name = "cacm-demo-litellm"
+version = "0.1.0"
+description = "Harness SDK + LiteLLM GenAI tracing demo (support-ticket triage)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "harness-sdk[litellm]>=1.0.7",
+    # harness-sdk[litellm] already depends on this transitively, but it's
+    # pinned explicitly here (same reasoning as anthropic/'s explicit
+    # anthropic>=0.40.0 pin) because main.py imports litellm directly --
+    # this demo's lockfile should control that version, not just whatever
+    # the extra happens to resolve.
+    "litellm>=1.60.0",
+    # Unlike 1-harness-sdk/openai/, no explicit httpx dependency is needed
+    # here even though openai>=2.x is one of litellm's own transitive deps
+    # (litellm supports the OpenAI-compatible wire format for some
+    # providers). openai/'s httpx requirement (LLD §12.2) is specifically
+    # about opentelemetry-instrumentation-openai_v2 importing plain httpx
+    # while openai>=2.x vendors a renamed one -- this app never uses that
+    # instrumentor package. harness_sdk's LiteLLM instrumentor wraps
+    # litellm's own functions directly and has no such dependency, and
+    # litellm itself already depends on plain httpx>=0.28 regardless.
+    #
+    # Also unlike anthropic/, no explicit opentelemetry-instrumentation-*
+    # or opentelemetry-util-genai pin is needed: harness_sdk's LiteLLM
+    # instrumentation is Harness-authored code in harness_sdk itself (see
+    # harness_sdk/instrumentation/litellm/), not a third-party OTel
+    # instrumentor package with its own version-drift risk.
+    #
+    # main.py reads TRACE_TARGET / HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN /
+    # ANTHROPIC_API_KEY / LITELLM_* from a .env file (see .env.example) --
+    # neither uv nor Python loads .env files on its own.
+    "python-dotenv>=1.0.0",
+]

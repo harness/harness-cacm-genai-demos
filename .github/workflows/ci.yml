@@ -1,0 +1,293 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-app:
+    name: test-app (${{ matrix.app_dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # One entry per shippable app folder. Add an entry here in the same
+        # PR that adds the app. mock_script must exist under
+        # .github/scripts/ and answer a stubbed version of that provider's
+        # API on :8080; base_url_var/api_key_var must be the exact env var
+        # names that app's main.py reads to build its provider client, and
+        # base_url_value the exact value that SDK expects for the mock
+        # (some providers want a /v1 suffix baked into base_url, some
+        # append their own versioned path -- see each app's main.py).
+        # expected_spans must match the exact number of spans that app's
+        # main.py produces per run -- 1 per provider call, plus 1 more for
+        # the manually-created "support_ticket_triage" wrapper span every
+        # 1-harness-sdk/* app's main.py opens around its provider calls
+        # (see e.g. google-genai-vertex's main.py for why it needs one --
+        # openai/anthropic/litellm/google-genai-vertex all need it, since
+        # each of those instrumentors opens and closes its own span
+        # entirely inside a single provider call). gen_ai_operation_prefix
+        # excludes that wrapper span (which carries no gen_ai.* attributes
+        # of its own) from the per-span gen_ai.* key check while still
+        # counting it towards expected_spans.
+        include:
+          - app_dir: 1-harness-sdk/openai
+            service_name: cacm-demo-openai
+            mock_script: mock_openai_server.py
+            base_url_var: OPENAI_BASE_URL
+            base_url_value: http://127.0.0.1:8080/v1
+            api_key_var: OPENAI_API_KEY
+            # 4, not 3: main.py wraps its three chat.completions.create()
+            # calls in one manually-created "support_ticket_triage" parent
+            # span (see main.py's STEP 4 comment for why). That wrapper
+            # span carries no gen_ai.* attributes of its own, so
+            # gen_ai_operation_prefix excludes it from the per-span
+            # gen_ai.* key check below while still counting towards
+            # expected_spans.
+            expected_spans: 4
+            gen_ai_operation_prefix: "chat "
+          - app_dir: 1-harness-sdk/anthropic
+            service_name: cacm-demo-anthropic
+            mock_script: mock_anthropic_server.py
+            base_url_var: ANTHROPIC_BASE_URL
+            base_url_value: http://127.0.0.1:8080
+            api_key_var: ANTHROPIC_API_KEY
+            # 4, not 3: same "support_ticket_triage" wrapper span as
+            # openai/ above, around this app's three messages.create()
+            # calls -- see that entry's comment.
+            expected_spans: 4
+            gen_ai_operation_prefix: "chat "
+          - app_dir: 3-manual-instrumentation/python
+            service_name: cacm-demo-manual-python
+            # Same OpenAI wire format as 1-harness-sdk/openai/ -- this
+            # app calls the OpenAI SDK too, just wraps it in hand-rolled
+            # spans instead of an instrumentor. No new mock script needed.
+            mock_script: mock_openai_server.py
+            base_url_var: OPENAI_BASE_URL
+            base_url_value: http://127.0.0.1:8080/v1
+            api_key_var: OPENAI_API_KEY
+            expected_spans: 3
+          - app_dir: 1-harness-sdk/litellm
+            service_name: cacm-demo-litellm
+            # LITELLM_MODEL defaults to anthropic/claude-haiku-4-5, and
+            # LiteLLM posts to the same /v1/messages wire format the raw
+            # Anthropic SDK does -- mock_anthropic_server.py's response
+            # shape works unchanged. main.py reads the mock's base URL
+            # from LITELLM_API_BASE, not ANTHROPIC_BASE_URL, since LiteLLM
+            # takes api_base as its own per-call argument.
+            mock_script: mock_anthropic_server.py
+            base_url_var: LITELLM_API_BASE
+            base_url_value: http://127.0.0.1:8080
+            api_key_var: ANTHROPIC_API_KEY
+            # 4, not 3: same "support_ticket_triage" wrapper span as
+            # openai/ and anthropic/ above, around this app's three
+            # litellm.completion() calls -- see openai/'s entry comment.
+            # gen_ai_operation_prefix is "litellm_request" here, not
+            # "chat ": this instrumentor names every span after itself
+            # (litellm_request) rather than after the routed model, and
+            # that name doesn't share a prefix with the parent span's
+            # "support_ticket_triage" -- so the exact span name still
+            # excludes the parent from the per-span gen_ai.* key check.
+            expected_spans: 4
+            gen_ai_operation_prefix: "litellm_request"
+          - app_dir: 1-harness-sdk/google-genai-vertex
+            service_name: cacm-demo-google-genai-vertex
+            # Vertex AI's generateContent wire format matches neither
+            # openai/'s nor anthropic/'s mock -- mock_google_genai_server.py
+            # answers it directly (see that script's own comment for the
+            # exact request/response shape). No api_key_var: Vertex AI
+            # authenticates via Application Default Credentials, not a key,
+            # and main.py's GOOGLE_GENAI_BASE_URL branch bypasses ADC
+            # entirely for this run rather than needing a stub credential
+            # (see main.py's comment on that branch for how).
+            mock_script: mock_google_genai_server.py
+            base_url_var: GOOGLE_GENAI_BASE_URL
+            base_url_value: http://127.0.0.1:8080
+            api_key_var: ""
+            # 4, not 3: main.py wraps its three generate_content() calls in
+            # one manually-created "support_ticket_triage" parent span (see
+            # main.py's STEP 4 comment for why), so this app emits one more
+            # span than the other apps in this matrix. That wrapper span
+            # carries no gen_ai.* attributes of its own, so
+            # gen_ai_operation_prefix excludes it from the per-span
+            # gen_ai.* key check below while still counting towards
+            # expected_spans.
+            expected_spans: 4
+            gen_ai_operation_prefix: "chat "
+    services:
+      jaeger:
+        image: jaegertracing/all-in-one:1.76.0
+        env:
+          COLLECTOR_OTLP_ENABLED: "true"
+        ports:
+          - 16686:16686
+          - 4318:4318
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: uv sync --locked
+        working-directory: ${{ matrix.app_dir }}
+        run: uv sync --locked
+
+      - name: Import smoke test
+        working-directory: ${{ matrix.app_dir }}
+        run: uv run python -c "import main"
+
+      # No live provider keys or Harness tokens run in CI (LLD §13). Each
+      # app calls a real provider SDK, so a stubbed provider stands in for
+      # it: a stdlib-only http.server script per provider wire format
+      # (matrix.mock_script), started with the runner's system python3 (no
+      # app dependency needed). openai/'s mock answers OpenAI's
+      # /v1/chat/completions shape; anthropic/'s answers Anthropic's
+      # /v1/messages shape -- see the two scripts under .github/scripts/
+      # for exactly what each returns and why (e.g. which call gets a
+      # tool-call/tool_use response vs. a plain completion).
+      - name: Start mock provider server
+        run: |
+          nohup python3 .github/scripts/${{ matrix.mock_script }} > mock-server.log 2>&1 &
+          echo $! > mock-server.pid
+
+      - name: Wait for mock server
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8080/healthz && exit 0
+            sleep 0.5
+          done
+          echo "mock provider server never became healthy" >&2
+          cat mock-server.log >&2
+          exit 1
+
+      # Each app reads a different pair of env var names for its provider
+      # base URL / API key (e.g. OPENAI_BASE_URL/OPENAI_API_KEY vs.
+      # ANTHROPIC_BASE_URL/ANTHROPIC_API_KEY). GitHub Actions' `env:` map
+      # keys can't be a matrix expression, so the pair is exported by name
+      # via $GITHUB_ENV instead of a literal env: block.
+      - name: Point app at the mock provider server
+        run: |
+          echo "${{ matrix.base_url_var }}=${{ matrix.base_url_value }}" >> "$GITHUB_ENV"
+          echo "${{ matrix.api_key_var }}=ci-stub-key" >> "$GITHUB_ENV"
+
+      # TRACE_TARGET=local against the jaeger service container above.
+      # LOCAL_OTLP_ENDPOINT is overridden to :4318 for this CI run only --
+      # that's the jaeger service container's real OTLP/HTTP port, not the
+      # 4418 local-collector/docker-compose.yaml uses for local dev to
+      # dodge a port-4318 collision with a local telemetry agent. A fresh
+      # CI runner has no such agent, so the collision the 4418 remap
+      # exists for doesn't apply here. .env.example's own 4418 default is
+      # untouched.
+      - name: Run app against Jaeger with stubbed provider endpoint
+        working-directory: ${{ matrix.app_dir }}
+        env:
+          TRACE_TARGET: local
+          LOCAL_OTLP_ENDPOINT: http://localhost:4318
+        run: uv run main.py
+
+      - name: Assert span count and gen_ai.* keys in Jaeger
+        run: |
+          python3 .github/scripts/assert_traces.py \
+            --service ${{ matrix.service_name }} \
+            --expected-spans ${{ matrix.expected_spans }} \
+            --gen-ai-operation-prefix "${{ matrix.gen_ai_operation_prefix }}"
+
+      - name: Dump mock server log
+        if: always()
+        run: cat mock-server.log || true
+
+  # A separate job, not another test-app matrix entry: this app has no
+  # main.py/pyproject.toml/uv.lock (LLD/CONTRIBUTING.md's litellm-proxy
+  # exception) -- it's a docker-compose lifecycle (bring up a proxy
+  # container + its own bundled Jaeger, run request.sh's curl calls,
+  # tear down) rather than "uv sync, uv run main.py", so it doesn't share
+  # a single step sequence with the uv-based apps above without a pile of
+  # per-step `if:` conditionals.
+  test-litellm-proxy:
+    name: test-app (2-open-source-sdks/litellm-proxy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 2-open-source-sdks/litellm-proxy
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same stubbed OpenAI server every 1-harness-sdk/openai/ and
+      # 3-manual-instrumentation/python/ CI run uses above -- config.yaml
+      # routes this app's one model through openai/gpt-4o-mini specifically
+      # so this mock can be reused instead of writing a new one.
+      - name: Start mock provider server
+        working-directory: .
+        run: |
+          nohup python3 .github/scripts/mock_openai_server.py > mock-server.log 2>&1 &
+          echo $! > mock-server.pid
+
+      - name: Wait for mock server
+        working-directory: .
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8080/healthz && exit 0
+            sleep 0.5
+          done
+          echo "mock provider server never became healthy" >&2
+          cat mock-server.log >&2
+          exit 1
+
+      # The litellm container reaches the mock server via
+      # host.docker.internal (docker-compose.yaml's extra_hosts entry),
+      # not 127.0.0.1 -- from inside a container, 127.0.0.1 is the
+      # container's own loopback, not the runner's.
+      - name: Point the proxy at the mock provider server
+        run: |
+          cp .env.example .env
+          echo "OPENAI_API_KEY=ci-stub-key" >> .env
+          echo "OPENAI_API_BASE=http://host.docker.internal:8080/v1" >> .env
+
+      # `docker compose` (v2, space), not this repo's usual customer-facing
+      # `docker-compose` (v1, hyphenated, see local-collector/README.md) --
+      # the compose file format is identical either way, but only the v2
+      # plugin is guaranteed present on this runner image.
+      - name: Start litellm proxy + its bundled Jaeger
+        run: docker compose up -d
+
+      - name: Wait for the proxy to be healthy
+        run: |
+          for i in $(seq 1 40); do
+            curl -sf http://127.0.0.1:4000/health/liveliness && exit 0
+            sleep 1
+          done
+          echo "litellm proxy never became healthy" >&2
+          docker compose logs
+          exit 1
+
+      - name: Run request.sh against the proxy
+        run: ./request.sh
+
+      # Verified against a real docker-compose run, not assumed: the
+      # proxy's otel callback emits a 7-span internal call tree per
+      # request (Received Proxy Server Request -> proxy_pre_call/router
+      # x2/self/litellm_request -> raw_gen_ai_request), so 3 curl calls
+      # produce 21 spans in the one shared trace, not 3. Only the
+      # litellm_request spans carry gen_ai.* attributes, and this
+      # callback predates the gen_ai.provider.name semantic-convention
+      # name -- it emits gen_ai.system instead. See README.md "What to
+      # look for" for the full span tree.
+      - name: Assert span count and gen_ai.* keys in Jaeger
+        working-directory: .
+        run: |
+          python3 .github/scripts/assert_traces.py \
+            --service cacm-demo-litellm-proxy \
+            --expected-spans 21 \
+            --gen-ai-operation-prefix "litellm_request" \
+            --gen-ai-provider-key "gen_ai.system"
+
+      - name: Dump proxy + mock server logs
+        if: always()
+        run: |
+          docker compose logs || true
+          cat ../../mock-server.log || true
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v || true

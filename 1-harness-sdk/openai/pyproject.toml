@@ -1,0 +1,20 @@
+[project]
+name = "cacm-demo-openai"
+version = "0.1.0"
+description = "Harness SDK + OpenAI GenAI tracing demo (support-ticket triage)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "harness-sdk[openai]>=1.0.7",
+    "openai>=2.53.0",
+    # openai>=2.x vendors its own renamed httpx/httpcore instead of depending
+    # on plain httpx. harness-sdk's OpenAI instrumentor
+    # (opentelemetry-instrumentation-openai_v2) still imports plain httpx
+    # directly, so it must be pulled in explicitly here or the instrumentor
+    # silently no-ops (no error, no spans).
+    "httpx",
+    # main.py reads TRACE_TARGET / HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN /
+    # OPENAI_* from a .env file (see .env.example) -- neither uv nor Python
+    # loads .env files on its own.
+    "python-dotenv>=1.0.0",
+]

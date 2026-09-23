@@ -1,0 +1,39 @@
+# LiteLLM proxy config. This file (plus docker-compose.yaml) is why this
+# app has no main.py, pyproject.toml, or uv.lock, unlike every other app
+# in this repo -- the proxy is the thing being instrumented, not a script
+# calling an SDK. See README.md "How it works" for what each piece below
+# does and request.sh for the client side of the demo.
+
+model_list:
+  - model_name: support-ticket-triage
+    litellm_params:
+      # OpenAI-compatible on purpose, not because this demo is tied to
+      # OpenAI specifically: it lets CI reuse the same stubbed
+      # /v1/chat/completions server every 1-harness-sdk/openai/ CI run
+      # already uses (.github/scripts/mock_openai_server.py) instead of
+      # needing a new mock for this app. Point this at any LiteLLM
+      # provider string ("anthropic/...", "bedrock/...", "vertex_ai/...")
+      # to use a different provider -- see README.md "Adapt this to your
+      # app" for what else needs to change if you do.
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+      # Deliberately left as an indirection, not hardcoded or omitted.
+      # LiteLLM's os.environ/<NAME> syntax resolves to None -- not "" --
+      # when the named var is entirely absent from the container's
+      # environment, and passing api_base=None through to the
+      # OpenAI-compatible client is the same as not setting it at all, so
+      # a real OpenAI account is used. docker-compose.yaml's
+      # `env_file: .env` only forwards vars that are actually present in
+      # your .env, so simply not adding an OPENAI_API_BASE line to your
+      # own .env (the default -- see .env.example) is what keeps this
+      # pointed at the real API. CI sets it to a stubbed server instead
+      # (see .github/workflows/ci.yml's litellm-proxy job).
+      api_base: os.environ/OPENAI_API_BASE
+
+litellm_settings:
+  # This one line is this app's entire reason to exist: LiteLLM's own
+  # OTel logging callback, which emits gen_ai.* spans for every request
+  # the proxy handles -- no SDK import, no instrumentor, no code at all
+  # on the client side. See README.md "What to look for" for the exact
+  # spans/attributes this produces.
+  callbacks: ["otel"]

@@ -1,0 +1,62 @@
+services:
+  # Bundled Jaeger, not a reference to the repo root's local-collector/.
+  # Every other app in this repo is a uv-managed Python script that can
+  # just point LOCAL_OTLP_ENDPOINT at local-collector/'s Jaeger; this app
+  # is a long-lived proxy container instead, and per LLD/CONTRIBUTING's
+  # file contract exception for this folder, it brings its own Jaeger so
+  # it stays copyable out of this repo in isolation, like every other app
+  # folder here (see repo root README.md).
+  #
+  # Remapped to 4418/4417, not the OTel defaults 4318/4317, for the exact
+  # reason local-collector/README.md documents: something on your machine
+  # may already be listening on 127.0.0.1:4318, answering every OTLP POST
+  # with HTTP 200, and silently discarding it. Only the host-side ports
+  # are remapped -- litellm below reaches this container over the compose
+  # network at jaeger:4318, the container-internal port, unaffected by the
+  # remap.
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    container_name: cacm-demo-litellm-proxy-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4418:4318"   # OTLP HTTP receiver (host side only, see above)
+      - "4417:4317"   # OTLP gRPC receiver
+
+  # The LiteLLM proxy. config.yaml is the model list + the otel callback
+  # that's this whole app's point; .env.example documents every var this
+  # service reads.
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: cacm-demo-litellm-proxy
+    # Only vars actually present in your .env get forwarded to the
+    # container -- see config.yaml's comment on OPENAI_API_BASE for why
+    # that (rather than an empty default) is the behavior this app needs.
+    env_file: .env
+    environment:
+      # Proxy-specific OTel vars (LLD §11.2) -- distinct from the standard
+      # OTEL_EXPORTER_OTLP_* vars, with LiteLLM documented to fall back to
+      # those if these are unset. "jaeger" below is the compose-network
+      # DNS name from this file, not something you edit for local mode;
+      # switch to Harness mode by setting OTEL_ENDPOINT/OTEL_HEADERS in
+      # .env instead (see .env.example) -- the ${VAR:-default} syntax
+      # below means your .env values win once set, and these local
+      # defaults apply only when they aren't.
+      - OTEL_EXPORTER=${OTEL_EXPORTER:-otlp_http}
+      - OTEL_ENDPOINT=${OTEL_ENDPOINT:-http://jaeger:4318}
+      - OTEL_HEADERS=${OTEL_HEADERS:-}
+      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES:-service.name=cacm-demo-litellm-proxy}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "4000:4000"
+    depends_on:
+      - jaeger
+    # Lets the container reach a stub server bound to the *host's*
+    # loopback interface. Used only by CI (.github/workflows/ci.yml),
+    # which stands in a local http.server for a real OpenAI account;
+    # unused and harmless for a real local or Harness-mode run.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
