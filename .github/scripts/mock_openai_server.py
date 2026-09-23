@@ -18,7 +18,16 @@ import json
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-HOST = "127.0.0.1"
+# 0.0.0.0, not 127.0.0.1: litellm-proxy's CI job reaches this server from
+# inside a container via host.docker.internal:host-gateway, which on
+# native Linux Docker Engine (GitHub's ubuntu-latest runners) is a real
+# bridge-gateway IP, not a loopback alias -- a socket bound to 127.0.0.1
+# silently refuses traffic arriving on that interface. The other two CI
+# jobs that reuse this script (1-harness-sdk/openai, 3-manual-
+# instrumentation/python) run the app directly on the runner and connect
+# over 127.0.0.1 either way, so this is a strict widening, not a behavior
+# change for them.
+HOST = "0.0.0.0"
 PORT = 8080
 
 
