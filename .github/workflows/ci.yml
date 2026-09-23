@@ -165,11 +165,16 @@ jobs:
       # base URL / API key (e.g. OPENAI_BASE_URL/OPENAI_API_KEY vs.
       # ANTHROPIC_BASE_URL/ANTHROPIC_API_KEY). GitHub Actions' `env:` map
       # keys can't be a matrix expression, so the pair is exported by name
-      # via $GITHUB_ENV instead of a literal env: block.
+      # via $GITHUB_ENV instead of a literal env: block. google-genai-vertex
+      # has no api_key_var (Vertex AI authenticates via ADC, not a key) --
+      # skip that line entirely rather than writing a nameless "=ci-stub-key"
+      # entry, which the runner's GITHUB_ENV file-command parser rejects.
       - name: Point app at the mock provider server
         run: |
           echo "${{ matrix.base_url_var }}=${{ matrix.base_url_value }}" >> "$GITHUB_ENV"
-          echo "${{ matrix.api_key_var }}=ci-stub-key" >> "$GITHUB_ENV"
+          if [ -n "${{ matrix.api_key_var }}" ]; then
+            echo "${{ matrix.api_key_var }}=ci-stub-key" >> "$GITHUB_ENV"
+          fi
 
       # TRACE_TARGET=local against the jaeger service container above.
       # LOCAL_OTLP_ENDPOINT is overridden to :4318 for this CI run only --

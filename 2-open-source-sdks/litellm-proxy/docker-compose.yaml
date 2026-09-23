@@ -28,7 +28,15 @@ services:
   # that's this whole app's point; .env.example documents every var this
   # service reads.
   litellm:
-    image: ghcr.io/berriai/litellm:main-stable
+    # Pinned by digest, not the floating `main-stable` tag: that tag moves
+    # underneath this file with no version bump anywhere in this repo, so
+    # a CI run and a local run on different days can pull different
+    # builds -- exactly the "broken upstream release" scenario every other
+    # app in this repo pins a uv.lock against. This digest is litellm
+    # 1.101.0, verified against a live docker-compose up + ./request.sh
+    # run (including Call 1's forced tool_choice). Bump deliberately, not
+    # by floating.
+    image: ghcr.io/berriai/litellm@sha256:d295634e09c648dcdb72c4cc2dd226f5fb87823a73e88cbbed6f205e4deb044b
     container_name: cacm-demo-litellm-proxy
     # Only vars actually present in your .env get forwarded to the
     # container -- see config.yaml's comment on OPENAI_API_BASE for why
