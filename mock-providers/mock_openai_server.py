@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
-"""Minimal OpenAI-compatible /v1/chat/completions stub, for CI only.
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""Minimal OpenAI-compatible /v1/chat/completions stub.
 
 Stands in for a real OpenAI account (or a local Ollama instance) so
-1-harness-sdk/openai/main.py's three support-ticket-triage calls can run
-in CI with no provider credentials. Stdlib-only (http.server) so it runs
-under the runner's system python3, outside any app's uv-managed venv --
-no dependency on the app's pyproject.toml/uv.lock.
+1-harness-sdk/openai/'s, 3-manual-instrumentation/python/'s, and
+2-open-source-sdks/litellm-proxy/'s three support-ticket-triage calls can
+run with no provider credentials at all -- see each app's README.md
+"Prerequisites"/Setup for how to point it at this server. Also used by
+.github/workflows/ci.yml, unmodified, so this is the exact same stub a
+customer would run locally, not a separate CI-only fixture. Stdlib-only
+(http.server); the PEP 723 block above lets `uv run` execute it in its own
+throwaway environment, independent of any app's pyproject.toml/uv.lock and
+with no separate python3 install needed.
+
+Canned responses only -- this exercises the OTel instrumentation pipeline
+(spans, gen_ai.* attributes) end to end, it does not produce real model
+output or realistic token counts. Switch back to a real key (or Ollama)
+once you've confirmed spans show up in Jaeger.
 
 Response shape matches the OpenAI Chat Completions API closely enough for
 opentelemetry-instrumentation-openai_v2 to populate gen_ai.request.model

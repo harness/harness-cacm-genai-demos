@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
-"""Minimal Vertex AI generateContent stub, for CI (and local testing without
-Google Cloud / ADC).
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""Minimal Vertex AI generateContent stub.
 
 Stands in for a real Vertex AI project so
-1-harness-sdk/google-genai-vertex/main.py's three support-ticket-triage
-calls can run with no Google Cloud credentials at all. Stdlib-only
-(http.server) so it runs under the system python3, outside any app's
-uv-managed venv -- no dependency on the app's pyproject.toml/uv.lock.
+1-harness-sdk/google-genai-vertex/'s three support-ticket-triage calls can
+run with no Google Cloud credentials at all, no `gcloud auth
+application-default login` needed -- see that app's README.md
+"Prerequisites"/Setup for how to point it at this server. Also used by
+.github/workflows/ci.yml, unmodified, so this is the exact same stub a
+customer would run locally, not a separate CI-only fixture. Stdlib-only
+(http.server); the PEP 723 block above lets `uv run` execute it in its own
+throwaway environment, independent of any app's pyproject.toml/uv.lock and
+with no separate python3 install needed.
+
+Canned responses only -- this exercises the OTel instrumentation pipeline
+(spans, gen_ai.* attributes) end to end, it does not produce real model
+output or realistic token counts. Switch to real ADC credentials once
+you've confirmed spans show up in Jaeger.
 
 Unlike openai/'s and anthropic/'s mocks, this isn't reached via a
 provider-specific *_BASE_URL env var pointing at an OpenAI-/Anthropic-

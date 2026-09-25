@@ -32,14 +32,21 @@ distinction from this one.
 - `curl`, [`jq`](https://jqlang.org/), and `openssl` (all three are
   present by default on the GitHub Actions runner this also runs under in
   CI; on macOS, `brew install jq` if you don't already have it)
-- A real OpenAI API key — there's no local-Ollama-style zero-cost path for
-  this app; `request.sh` talks to the proxy over HTTP, and the proxy needs
-  a real upstream to call.
-- **Local mode (default):** no Harness account, no Harness token needed —
-  only the OpenAI key above.
+- [`uv`](https://docs.astral.sh/uv/), to run the mock provider server
+  (**local mode default** — see below).
+- **Local mode (default):** no OpenAI account, no Harness account, no
+  Harness token needed. `request.sh` talks to the proxy over HTTP and the
+  proxy needs an upstream to call — there's no local-Ollama-style
+  zero-cost path the way `1-harness-sdk/openai/` has — so the shipped
+  `.env.example` points the proxy at
+  [`mock-providers/mock_openai_server.py`](../../mock-providers/README.md)
+  instead: a stub that answers OpenAI's wire format with canned
+  responses. To use a real OpenAI account instead (real model output,
+  real token counts), get an API key and see "Setup" below.
 - **Harness mode:** a Harness account ID and an ordinary personal/
   service-account token, sent as `x-harness-service-token` (see
-  `docs/01-get-your-token.md`), in addition to the OpenAI key.
+  `docs/01-get-your-token.md`), in addition to a real OpenAI key (the
+  mock only proves the plumbing works — see `mock-providers/README.md`).
 
 ## Setup
 
@@ -47,22 +54,41 @@ distinction from this one.
 cp .env.example .env
 ```
 
-Put your OpenAI key in `.env` (`OPENAI_API_KEY=`) — required even for a
-local-mode run. To also send traces to a real Harness account, uncomment
-and fill in the three `OTEL_*` lines at the bottom of `.env` instead of
+Local mode works with the file as shipped against the mock server (start
+it first — see "Run" below). To use a real OpenAI account instead, comment
+out `OPENAI_API_BASE` and put a real key in `OPENAI_API_KEY` (see
+`.env.example`'s comment on why commenting the line out, not blanking it,
+matters). To also send traces to a real Harness account, uncomment and
+fill in the three `OTEL_*` lines at the bottom of `.env` instead of
 editing `docker-compose.yaml` or `config.yaml` — see `.env.example`'s
 comments for exactly which three.
 
 ## Run
+
+In a separate terminal, leave this running (skip if using a real OPENAI_API_KEY):
+
+```bash
+uv run ../../mock-providers/mock_openai_server.py
+```
+
+Then, in this terminal — if you've already got `local-collector/`'s Jaeger
+running from another demo, stop it first (`cd ../../local-collector &&
+docker-compose down`): this app bundles its own Jaeger on the same host
+ports (`16686`, `4418`, `4417`), and `docker-compose up` below fails with a
+port-already-allocated error if both are up at once:
 
 ```bash
 docker-compose up -d
 ./request.sh
 ```
 
-Expected output (the severity label is deterministic — a forced tool call
-at `temperature=0`; the summary and draft-reply wording vary slightly run
-to run and are illustrative below):
+`request.sh` waits for the proxy's health endpoint before sending any
+requests, so it's safe to run right after `docker-compose up -d` returns
+— no manual delay needed.
+
+Expected output against a real OpenAI account (the severity label is
+deterministic — a forced tool call at `temperature=0`; the summary and
+draft-reply wording vary slightly run to run and are illustrative below):
 
 ```
 --- Ticket ---
@@ -85,6 +111,11 @@ for the disruption.
 Trace ID: <32 hex characters>
 Open http://localhost:16686, service cacm-demo-litellm-proxy, and search by this trace ID -- see README.md "What to look for."
 ```
+
+Against the default `mock-providers/` stub, the severity is still
+`critical` (same forced tool call), but the summary and draft reply are
+both the mock's fixed line, `This is a stubbed CI response for the demo
+scenario.` — expected; it proves the trace pipeline works, not the model.
 
 Local mode: open http://localhost:16686, find service
 `cacm-demo-litellm-proxy`. Harness mode: see `docs/02-verify-traces.md`
@@ -192,10 +223,11 @@ every other family's `.env.example` configures its own exporter.
   app: every span this proxy would have emitted simply stops existing,
   with no error anywhere to explain why.
 - The `extra_hosts: host.docker.internal:host-gateway` entry in
-  `docker-compose.yaml` — harmless for a real run, but CI relies on it to
-  reach its stubbed provider server; removing it breaks CI without
-  affecting local or Harness-mode behavior at all, which makes it an easy
-  thing to "clean up" by mistake.
+  `docker-compose.yaml` — harmless once you've switched to a real
+  `OPENAI_API_KEY`, but the default mock-mode local run (and CI) both rely
+  on it to reach the host-bound `mock-providers/mock_openai_server.py`;
+  removing it breaks the shipped default, not just CI, which makes it an
+  easy thing to "clean up" by mistake.
 - `env_file: .env` on the `litellm` service in `docker-compose.yaml`, and
   leaving `OPENAI_API_BASE` out of your own `.env` rather than setting it
   to an empty value — see `config.yaml`'s comment on `api_base` for why

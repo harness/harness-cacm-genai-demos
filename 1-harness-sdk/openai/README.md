@@ -25,14 +25,21 @@ they land, or `3-manual-instrumentation/python/` for a no-SDK approach.
 - Python >= 3.10
 - [`uv`](https://docs.astral.sh/uv/)
 - **Local mode (default):** nothing else. The shipped `.env.example`
-  points the OpenAI client at a local Ollama instance, so no OpenAI
-  account and no Harness account/token are needed. Install
-  [Ollama](https://ollama.com) and pull a small model:
-  `ollama run llama3.2:1b`.
-- **Harness mode:** an OpenAI API key (or continue pointing at Ollama —
-  the provider and the trace target are independent switches), plus a
-  Harness account ID and an ordinary personal/service-account token,
-  sent natively as `x-harness-service-token` (see `docs/01-get-your-token.md`).
+  points the OpenAI client at
+  [`mock-providers/mock_openai_server.py`](../../mock-providers/README.md),
+  so no OpenAI account and no Harness account/token are needed — start it
+  in a separate terminal
+  (`uv run ../../mock-providers/mock_openai_server.py`) before "Run"
+  below; canned responses, not real model output. Two alternatives, both
+  documented as commented-out blocks in `.env.example`: point
+  `OPENAI_BASE_URL` at a local [Ollama](https://ollama.com) instance
+  (`ollama run llama3.2:1b`) for real model output with still no OpenAI
+  account, or use a real OpenAI API key for the real API.
+- **Harness mode:** an OpenAI API key (or continue pointing at the mock
+  or Ollama — the provider and the trace target are independent
+  switches), plus a Harness account ID and an ordinary personal/
+  service-account token, sent natively as `x-harness-service-token` (see
+  `docs/01-get-your-token.md`).
 
 ## Setup
 
@@ -40,8 +47,13 @@ they land, or `3-manual-instrumentation/python/` for a no-SDK approach.
 cp .env.example .env
 ```
 
-Local mode works with the file as shipped — nothing to edit. To send
-traces to a real Harness account instead, edit two lines in `.env`:
+Local mode works with the file as shipped against the mock server (start
+it first — see "Run" below). To use a local Ollama instance instead (real
+model output, still zero OpenAI account) or a real OpenAI API key, comment
+out the shipped `OPENAI_*` lines in `.env` and uncomment the alternative
+block you want — see `.env.example`'s comments for exactly which lines.
+
+To send traces to a real Harness account instead, edit two lines in `.env`:
 
 ```bash
 TRACE_TARGET=harness
@@ -56,6 +68,14 @@ uv sync
 ```
 
 ## Run
+
+In a separate terminal, leave this running (skip if using Ollama or a real OPENAI_API_KEY):
+
+```bash
+uv run ../../mock-providers/mock_openai_server.py
+```
+
+Then, in this terminal:
 
 ```bash
 uv run main.py

@@ -62,9 +62,9 @@ services:
       - "4000:4000"
     depends_on:
       - jaeger
-    # Lets the container reach a stub server bound to the *host's*
-    # loopback interface. Used only by CI (.github/workflows/ci.yml),
-    # which stands in a local http.server for a real OpenAI account;
-    # unused and harmless for a real local or Harness-mode run.
+    # Lets the container reach the mock provider server (mock-providers/,
+    # or CI's copy of the same script) bound to the *host's* loopback
+    # interface. Used by the default local run and by CI alike; harmless
+    # if you switch .env to a real OPENAI_API_KEY/OPENAI_API_BASE.
     extra_hosts:
       - "host.docker.internal:host-gateway"

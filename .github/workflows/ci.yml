@@ -14,7 +14,7 @@ jobs:
       matrix:
         # One entry per shippable app folder. Add an entry here in the same
         # PR that adds the app. mock_script must exist under
-        # .github/scripts/ and answer a stubbed version of that provider's
+        # mock-providers/ and answer a stubbed version of that provider's
         # API on :8080; base_url_var/api_key_var must be the exact env var
         # names that app's main.py reads to build its provider client, and
         # base_url_value the exact value that SDK expects for the mock
@@ -140,15 +140,19 @@ jobs:
       # No live provider keys or Harness tokens run in CI (LLD §13). Each
       # app calls a real provider SDK, so a stubbed provider stands in for
       # it: a stdlib-only http.server script per provider wire format
-      # (matrix.mock_script), started with the runner's system python3 (no
-      # app dependency needed). openai/'s mock answers OpenAI's
-      # /v1/chat/completions shape; anthropic/'s answers Anthropic's
-      # /v1/messages shape -- see the two scripts under .github/scripts/
-      # for exactly what each returns and why (e.g. which call gets a
-      # tool-call/tool_use response vs. a plain completion).
+      # (matrix.mock_script), started via `uv run` -- each script's PEP 723
+      # inline metadata block gives it its own throwaway environment, so no
+      # app dependency and no separate python3 install are needed. openai/'s
+      # mock answers OpenAI's /v1/chat/completions shape; anthropic/'s
+      # answers Anthropic's /v1/messages shape -- see the scripts under
+      # mock-providers/ for exactly what each returns and why (e.g. which
+      # call gets a tool-call/tool_use response vs. a plain completion).
+      # These are the same scripts each app's own README.md points
+      # customers at for a zero-credential local run, not a CI-only
+      # fixture.
       - name: Start mock provider server
         run: |
-          nohup python3 .github/scripts/${{ matrix.mock_script }} > mock-server.log 2>&1 &
+          nohup uv run mock-providers/${{ matrix.mock_script }} > mock-server.log 2>&1 &
           echo $! > mock-server.pid
 
       - name: Wait for mock server
@@ -218,6 +222,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # This job has no other uv-based step (it's docker-compose, not
+      # `uv sync`/`uv run main.py`, per the litellm-proxy file-contract
+      # exception) -- installed here solely so the `uv run` mock-server
+      # step below has an interpreter to run the stub with.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
       # Same stubbed OpenAI server every 1-harness-sdk/openai/ and
       # 3-manual-instrumentation/python/ CI run uses above -- config.yaml
       # routes this app's one model through openai/gpt-4o-mini specifically
@@ -225,7 +236,7 @@ jobs:
       - name: Start mock provider server
         working-directory: .
         run: |
-          nohup python3 .github/scripts/mock_openai_server.py > mock-server.log 2>&1 &
+          nohup uv run mock-providers/mock_openai_server.py > mock-server.log 2>&1 &
           echo $! > mock-server.pid
 
       - name: Wait for mock server

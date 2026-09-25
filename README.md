@@ -46,6 +46,15 @@ defaults. To send traces to your real Harness account instead, see
 `docs/01-get-your-token.md`; each demo's `.env.example` documents the two
 lines you need to change.
 
+Most demos also need a real provider account. None of them require one by
+default: every `1-harness-sdk/`/`3-manual-instrumentation/python/`/
+`2-open-source-sdks/litellm-proxy/` app ships pointed at
+[`mock-providers/`](mock-providers/README.md)'s stub servers instead —
+`1-harness-sdk/openai/` and `3-manual-instrumentation/python/` also
+support a local Ollama instance as a real-model-output alternative, still
+with zero provider credentials. See `docs/03-run-locally-first.md` and
+each demo's own `README.md` "Prerequisites" for which paths apply.
+
 ## Usage
 
 Copy the one folder matching your stack from the table above out of this

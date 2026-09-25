@@ -26,15 +26,19 @@ for a no-SDK approach.
 
 - Python >= 3.10
 - [`uv`](https://docs.astral.sh/uv/)
-- An Anthropic API key. Unlike `openai/`, there's no local-Ollama-style
-  zero-cost provider path here — Anthropic has no OpenAI-API-compatible
-  local runtime this demo can point at instead, so a real key is required
-  even in local trace mode.
-- **Local mode (default):** no Harness account, no Harness token needed —
-  only the Anthropic key above.
+- **Local mode (default):** nothing else. Unlike `openai/`, there's no
+  local-Ollama-style zero-cost provider path here — Anthropic has no
+  OpenAI-API-compatible local runtime this demo can point at instead — so
+  the shipped `.env.example` points at
+  [`mock-providers/mock_anthropic_server.py`](../../mock-providers/README.md)
+  instead: a stub that answers the Anthropic wire format with canned
+  responses. No Anthropic account, no Harness account/token needed. To
+  use the real Anthropic API instead (real model output, real token
+  counts), get an API key and see "Setup" below.
 - **Harness mode:** a Harness account ID and an ordinary personal/
   service-account token, sent natively as `x-harness-service-token` (see
-  `docs/01-get-your-token.md`), in addition to the Anthropic key.
+  `docs/01-get-your-token.md`), in addition to a real Anthropic key (the
+  mock only proves the plumbing works — see `mock-providers/README.md`).
 
 ## Setup
 
@@ -42,9 +46,10 @@ for a no-SDK approach.
 cp .env.example .env
 ```
 
-Put your Anthropic key in `.env` (`ANTHROPIC_API_KEY=`) — this is required
-even for a local-mode run. To also send traces to a real Harness account,
-edit two more lines:
+Local mode works with the file as shipped against the mock server (start
+it first — see "Run" below). To use the real Anthropic API instead, clear
+`ANTHROPIC_BASE_URL` and put a real key in `ANTHROPIC_API_KEY`. To also
+send traces to a real Harness account, edit two more lines:
 
 ```bash
 TRACE_TARGET=harness
@@ -60,13 +65,21 @@ uv sync
 
 ## Run
 
+In a separate terminal, leave this running (skip if using a real ANTHROPIC_API_KEY):
+
+```bash
+uv run ../../mock-providers/mock_anthropic_server.py
+```
+
+Then, in this terminal:
+
 ```bash
 uv run main.py
 ```
 
-Expected console output (the severity label is deterministic — a forced
-tool call at `temperature=0`; the summary and draft-reply wording vary
-slightly run to run and are illustrative below):
+Expected console output against the real Anthropic API (the severity label
+is deterministic — a forced tool call at `temperature=0`; the summary and
+draft-reply wording vary slightly run to run and are illustrative below):
 
 ```
 --- Ticket ---
@@ -84,6 +97,11 @@ for the disruption.
 
 [OTel] Flushing spans...
 ```
+
+Against the default `mock-providers/` stub, the severity is still
+`critical` (same forced tool call), but the summary and draft reply are
+both the mock's fixed line, `This is a stubbed CI response for the demo
+scenario.` — expected; it proves the trace pipeline works, not the model.
 
 Local mode: open http://localhost:16686, find service `cacm-demo-anthropic`.
 Harness mode: see `docs/02-verify-traces.md` for the Cost Explorer path.
@@ -119,7 +137,11 @@ STEP 4/STEP 5 comments.
 Python SDK's own `usage.input_tokens` field excludes cache reads and cache
 writes — this app never sends cache-control breakpoints, so the
 distinction doesn't fire on every call, but the attribute's *definition*
-is still cache-exclusive, unlike some other providers' SDKs. This differs
+is still cache-exclusive, unlike some other providers' SDKs. (Running
+against `mock-providers/`'s stub instead of a real key: every span reports
+the same fixed `input_tokens: 42` / `output_tokens: 8` regardless of call
+— the mock proves the attributes populate, it doesn't reproduce this
+cache-token nuance. Use a real `ANTHROPIC_API_KEY` to see it.) This differs
 from [`1-harness-sdk/litellm/`](../litellm/README.md): LiteLLM normalizes
 usage to the OpenAI convention, where `prompt_tokens` *includes* cache
 reads and writes. For requests that exercise Anthropic prompt caching,

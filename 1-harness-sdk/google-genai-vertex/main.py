@@ -18,13 +18,22 @@ Run:
     cp .env.example .env    # edit GOOGLE_CLOUD_PROJECT, and
                              # HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN only if
                              # you're switching TRACE_TARGET to "harness"
-    gcloud auth application-default login   # one-time, see README.md
     uv sync
+
+    # In a separate terminal, leave this running (or set up real ADC
+    # instead and skip it):
+    uv run ../../mock-providers/mock_google_genai_server.py
+
+    # Back in this terminal:
     uv run main.py
 
 Unlike every other app in `1-harness-sdk/`, there's no provider API key in
 `.env` at all -- Vertex AI authenticates via Application Default
-Credentials, not a key. See README.md "Prerequisites".
+Credentials, not a key. There's also no local-Ollama-style zero-cost path
+for Vertex AI, so .env.example ships pointed at mock-providers/'s stub
+server by default, which main.py's STEP 3 uses to skip ADC entirely -- no
+`gcloud auth application-default login` needed to see a trace. See
+README.md "Prerequisites".
 """
 import os
 
@@ -135,19 +144,19 @@ def run():
 
     model = os.environ.get("GOOGLE_GENAI_MODEL", "gemini-2.0-flash")
 
-    # CI-only escape hatch: unset in every customer-facing .env.example.
     # google-genai's Vertex AI backend has no api_base/api_key-style local
-    # override, so CI can't point this app at a stub the way openai/'s
+    # override, so this app can't point at a stub the way openai/'s
     # OPENAI_BASE_URL or anthropic/'s ANTHROPIC_BASE_URL do. Instead, when
-    # GOOGLE_GENAI_BASE_URL is set, this app builds the client with
-    # http_options.base_url_resource_scope="COLLECTION" and *no*
-    # project/location. That combination (verified against the
-    # google-genai>=1.55.0 source) makes the client skip Application
-    # Default Credentials entirely -- both at Client() construction and at
-    # request time -- and send an unauthenticated request straight to
-    # GOOGLE_GENAI_BASE_URL with a bare "{model}:generateContent" path, no
+    # GOOGLE_GENAI_BASE_URL is set (the .env.example default), this app
+    # builds the client with http_options.base_url_resource_scope=
+    # "COLLECTION" and *no* project/location. That combination (verified
+    # against the google-genai>=1.55.0 source) makes the client skip
+    # Application Default Credentials entirely -- both at Client()
+    # construction and at request time -- and send an unauthenticated
+    # request straight to GOOGLE_GENAI_BASE_URL with a bare
+    # "{model}:generateContent" path, no
     # "projects/{project}/locations/{location}/" prefix. See
-    # .github/scripts/mock_google_genai_server.py.
+    # mock-providers/mock_google_genai_server.py and mock-providers/README.md.
     mock_base_url = os.environ.get("GOOGLE_GENAI_BASE_URL")
     if mock_base_url:
         client = genai.Client(

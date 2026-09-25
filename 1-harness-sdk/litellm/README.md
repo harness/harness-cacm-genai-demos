@@ -29,16 +29,20 @@ instead.
 
 - Python >= 3.10
 - [`uv`](https://docs.astral.sh/uv/)
-- An Anthropic API key. This demo's `LITELLM_MODEL` default
-  (`anthropic/claude-haiku-4-5`) routes to the Anthropic API through
-  LiteLLM, so — like `anthropic/`, and unlike `openai/` — there's no
-  local-Ollama-style zero-cost path: a real key is required even in local
-  trace mode.
-- **Local mode (default):** no Harness account, no Harness token needed —
-  only the Anthropic key above.
+- **Local mode (default):** nothing else. This demo's `LITELLM_MODEL`
+  default (`anthropic/claude-haiku-4-5`) routes to the Anthropic API
+  through LiteLLM, and — like `anthropic/`, and unlike `openai/` — there's
+  no local-Ollama-style zero-cost path for it, so the shipped
+  `.env.example` points `LITELLM_API_BASE` at
+  [`mock-providers/mock_anthropic_server.py`](../../mock-providers/README.md)
+  instead: a stub that answers the Anthropic wire format with canned
+  responses. No Anthropic account, no Harness account/token needed. To use
+  the real Anthropic API instead (real model output, real token counts),
+  get an API key and see "Setup" below.
 - **Harness mode:** a Harness account ID and an ordinary personal/
   service-account token, sent natively as `x-harness-service-token` (see
-  `docs/01-get-your-token.md`), in addition to the Anthropic key.
+  `docs/01-get-your-token.md`), in addition to a real Anthropic key (the
+  mock only proves the plumbing works — see `mock-providers/README.md`).
 
 ## Setup
 
@@ -46,9 +50,10 @@ instead.
 cp .env.example .env
 ```
 
-Put your Anthropic key in `.env` (`ANTHROPIC_API_KEY=`) — this is required
-even for a local-mode run. To also send traces to a real Harness account,
-edit two more lines:
+Local mode works with the file as shipped against the mock server (start
+it first — see "Run" below). To use the real Anthropic API instead, clear
+`LITELLM_API_BASE` and put a real key in `ANTHROPIC_API_KEY`. To also send
+traces to a real Harness account, edit two more lines:
 
 ```bash
 TRACE_TARGET=harness
@@ -64,13 +69,21 @@ uv sync
 
 ## Run
 
+In a separate terminal, leave this running (skip if using a real ANTHROPIC_API_KEY):
+
+```bash
+uv run ../../mock-providers/mock_anthropic_server.py
+```
+
+Then, in this terminal:
+
 ```bash
 uv run main.py
 ```
 
-Expected console output (the severity label is deterministic — a forced
-tool call at `temperature=0`; the summary and draft-reply wording vary
-slightly run to run and are illustrative below):
+Expected console output against the real Anthropic API (the severity label
+is deterministic — a forced tool call at `temperature=0`; the summary and
+draft-reply wording vary slightly run to run and are illustrative below):
 
 ```
 --- Ticket ---
@@ -88,6 +101,11 @@ for the disruption.
 
 [OTel] Flushing spans...
 ```
+
+Against the default `mock-providers/` stub, the severity is still
+`critical` (same forced tool call), but the summary and draft reply are
+both the mock's fixed line, `This is a stubbed CI response for the demo
+scenario.` — expected; it proves the trace pipeline works, not the model.
 
 Local mode: open http://localhost:16686, find service `cacm-demo-litellm`.
 Harness mode: see `docs/02-verify-traces.md` for the Cost Explorer path.
@@ -147,6 +165,13 @@ now includes tokens `anthropic/`'s definition excludes. **Don't sum
 `gen_ai.usage.input_tokens` across this app's traces and `anthropic/`'s as
 if they measured the same thing** — the attribute name is identical, the
 definition is not.
+
+(Running against `mock-providers/`'s stub instead of a real key: every
+span reports the same fixed `input_tokens: 42` / `output_tokens: 8`
+regardless of call or app, so this cache-inclusive-vs-exclusive divergence
+isn't visible at all in mock mode — it only shows up against the real
+Anthropic API. The mock proves the attributes populate, not this specific
+behavior.)
 
 ## How it works
 

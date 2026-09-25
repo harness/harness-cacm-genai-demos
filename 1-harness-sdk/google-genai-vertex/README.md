@@ -34,22 +34,23 @@ If you don't call `google-genai` directly, see `1-harness-sdk/openai/`,
 
 - Python >= 3.10
 - [`uv`](https://docs.astral.sh/uv/)
-- A Google Cloud project with the Vertex AI API enabled, and the
-  [`gcloud` CLI](https://cloud.google.com/sdk/docs/install).
-- **Application Default Credentials (ADC)** — run once, in the shell you'll
-  run this app from:
-  ```bash
-  gcloud auth application-default login
-  ```
-  Unlike every other app in `1-harness-sdk/`, there is no provider API key
-  anywhere in this app's `.env` — Vertex AI has no key-based auth mode.
-  This step is required even in local trace mode; there is no
-  local-Ollama-style zero-cost path for Vertex AI either.
-- **Local mode (default):** no Harness account, no Harness token needed —
-  only the ADC step above.
+- **Local mode (default):** nothing else. Unlike every other app in
+  `1-harness-sdk/`, there is no provider API key anywhere in this app's
+  `.env` — Vertex AI has no key-based auth mode, it authenticates via
+  Application Default Credentials (ADC) — and there's no
+  local-Ollama-style zero-cost path either. So the shipped `.env.example`
+  points `GOOGLE_GENAI_BASE_URL` at
+  [`mock-providers/mock_google_genai_server.py`](../../mock-providers/README.md)
+  instead: a stub that answers the Vertex AI wire format with canned
+  responses, and that main.py uses to skip ADC entirely (see its STEP 3
+  comment). No Google Cloud project, no `gcloud auth
+  application-default login`, no Harness account/token needed. To use
+  real Vertex AI instead (real model output, real token counts), see
+  "Setup" below.
 - **Harness mode:** a Harness account ID and an ordinary personal/
   service-account token, sent natively as `x-harness-service-token` (see
-  `docs/01-get-your-token.md`), in addition to ADC.
+  `docs/01-get-your-token.md`), in addition to real ADC credentials (the
+  mock only proves the plumbing works — see `mock-providers/README.md`).
 
 ## Setup
 
@@ -57,9 +58,13 @@ If you don't call `google-genai` directly, see `1-harness-sdk/openai/`,
 cp .env.example .env
 ```
 
-Put your Google Cloud project in `.env` (`GOOGLE_CLOUD_PROJECT=`) — this is
-required even for a local-mode run. To also send traces to a real Harness
-account, edit two more lines:
+Local mode works with the file as shipped against the mock server (start
+it first — see "Run" below). To use real Vertex AI instead, clear
+`GOOGLE_GENAI_BASE_URL`, set `GOOGLE_CLOUD_PROJECT`, and run
+`gcloud auth application-default login` once in the shell you'll run this
+app from (or set `GOOGLE_APPLICATION_CREDENTIALS` to a service-account
+key file). To also send traces to a real Harness account, edit two more
+lines:
 
 ```bash
 TRACE_TARGET=harness
@@ -75,13 +80,21 @@ uv sync
 
 ## Run
 
+In a separate terminal, leave this running (skip if using real ADC):
+
+```bash
+uv run ../../mock-providers/mock_google_genai_server.py
+```
+
+Then, in this terminal:
+
 ```bash
 uv run main.py
 ```
 
-Expected console output (the severity label is deterministic — a forced
-function call at `temperature=0`; the summary and draft-reply wording vary
-slightly run to run and are illustrative below):
+Expected console output against real Vertex AI (the severity label is
+deterministic — a forced function call at `temperature=0`; the summary and
+draft-reply wording vary slightly run to run and are illustrative below):
 
 ```
 --- Ticket ---
@@ -99,6 +112,12 @@ for the disruption.
 
 [OTel] Flushing spans...
 ```
+
+Against the default `mock-providers/` stub, the severity is still
+`critical` (same forced function call), but the summary and draft reply
+are both the mock's fixed line, `This is a stubbed CI response for the
+demo scenario.` — expected; it proves the trace pipeline works, not the
+model.
 
 Local mode: open http://localhost:16686, find service
 `cacm-demo-google-genai-vertex`.

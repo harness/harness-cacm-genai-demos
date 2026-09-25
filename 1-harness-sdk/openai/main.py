@@ -8,10 +8,18 @@ Run:
     cp .env.example .env    # edit HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN only
                              # if you're switching TRACE_TARGET to "harness"
     uv sync
+
+    # In a separate terminal, leave this running (or point .env at a
+    # local Ollama instance or a real OPENAI_API_KEY instead and skip
+    # it -- see .env.example):
+    uv run ../../mock-providers/mock_openai_server.py
+
+    # Back in this terminal:
     uv run main.py
 
 TRACE_TARGET=local (the default) needs no Harness account, no Harness
-token, and -- with the shipped Ollama defaults -- no OpenAI account either.
+token, and -- with the shipped mock-server defaults -- no OpenAI account
+either.
 """
 import json
 import os

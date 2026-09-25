@@ -9,11 +9,18 @@ Run:
     cp .env.example .env    # edit HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN only
                              # if you're switching TRACE_TARGET to "harness"
     uv sync
+
+    # In a separate terminal, leave this running (or set a real
+    # ANTHROPIC_API_KEY instead and skip it):
+    uv run ../../mock-providers/mock_anthropic_server.py
+
+    # Back in this terminal:
     uv run main.py
 
-Unlike openai/, there's no local zero-cost provider path here (no
-Ollama-equivalent for Anthropic) -- ANTHROPIC_API_KEY is required even
-when TRACE_TARGET=local. See README.md "Prerequisites".
+Unlike openai/, there's no Ollama-equivalent local runtime for Anthropic's
+Messages API -- but .env.example ships pointed at mock-providers/'s stub
+server by default, so no real ANTHROPIC_API_KEY is needed to see a trace.
+See README.md "Prerequisites".
 """
 import os
 
@@ -137,12 +144,13 @@ def run():
     import anthropic  # noqa: E402  (deliberately imported AFTER instrument())
 
     client = anthropic.Anthropic(
-        # Unset in every customer-facing .env.example -- there's no
-        # Ollama-equivalent local runtime for Anthropic's Messages API to
-        # point at (see README "Prerequisites"). ANTHROPIC_BASE_URL exists
-        # only so CI (and local testing without a real key) can point this
-        # at a stubbed /v1/messages server; see
-        # .github/scripts/mock_anthropic_server.py.
+        # There's no Ollama-equivalent local runtime for Anthropic's
+        # Messages API to point at (see README "Prerequisites"), so
+        # .env.example ships this pointed at mock-providers/'s stub
+        # /v1/messages server by default -- see
+        # mock-providers/mock_anthropic_server.py and mock-providers/README.md.
+        # Clear ANTHROPIC_BASE_URL and set a real ANTHROPIC_API_KEY to use
+        # the real Anthropic API instead.
         base_url=os.environ.get("ANTHROPIC_BASE_URL") or None,
         api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
     )

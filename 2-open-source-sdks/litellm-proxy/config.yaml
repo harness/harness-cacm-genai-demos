@@ -8,9 +8,9 @@ model_list:
   - model_name: support-ticket-triage
     litellm_params:
       # OpenAI-compatible on purpose, not because this demo is tied to
-      # OpenAI specifically: it lets CI reuse the same stubbed
-      # /v1/chat/completions server every 1-harness-sdk/openai/ CI run
-      # already uses (.github/scripts/mock_openai_server.py) instead of
+      # OpenAI specifically: it lets this app reuse the same stubbed
+      # /v1/chat/completions server every 1-harness-sdk/openai/ run
+      # already uses (mock-providers/mock_openai_server.py) instead of
       # needing a new mock for this app. Point this at any LiteLLM
       # provider string ("anthropic/...", "bedrock/...", "vertex_ai/...")
       # to use a different provider -- see README.md "Adapt this to your
@@ -25,9 +25,9 @@ model_list:
       # a real OpenAI account is used. docker-compose.yaml's
       # `env_file: .env` only forwards vars that are actually present in
       # your .env, so simply not adding an OPENAI_API_BASE line to your
-      # own .env (the default -- see .env.example) is what keeps this
-      # pointed at the real API. CI sets it to a stubbed server instead
-      # (see .github/workflows/ci.yml's litellm-proxy job).
+      # own .env is what keeps this pointed at the real API. .env.example
+      # ships it pointed at mock-providers/'s stub server by default
+      # instead (see .env.example's comment and README.md "Setup").
       api_base: os.environ/OPENAI_API_BASE
 
 litellm_settings:

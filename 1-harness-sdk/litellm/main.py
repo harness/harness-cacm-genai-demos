@@ -15,11 +15,18 @@ Run:
     cp .env.example .env    # edit HARNESS_ACCOUNT_ID / HARNESS_REPORTING_TOKEN only
                              # if you're switching TRACE_TARGET to "harness"
     uv sync
+
+    # In a separate terminal, leave this running (or set a real
+    # ANTHROPIC_API_KEY instead and skip it):
+    uv run ../../mock-providers/mock_anthropic_server.py
+
+    # Back in this terminal:
     uv run main.py
 
-Like anthropic/, there's no local zero-cost provider path here -- LiteLLM
-still needs a real ANTHROPIC_API_KEY to reach the Anthropic API, even when
-TRACE_TARGET=local. See README.md "Prerequisites".
+Like anthropic/, there's no Ollama-equivalent local runtime LiteLLM can
+fall back to for the Anthropic route -- but .env.example ships LITELLM_API_BASE
+pointed at mock-providers/'s stub server by default, so no real
+ANTHROPIC_API_KEY is needed to see a trace. See README.md "Prerequisites".
 """
 import json
 import os

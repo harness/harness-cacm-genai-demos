@@ -34,6 +34,25 @@ chat() {
     -d "$1"
 }
 
+# `docker-compose up -d` reports a container "Started" the instant the
+# process launches, not once the proxy inside has finished booting and is
+# accepting requests -- calling straight into Call 1 below without this
+# wait races that startup. Under `set -e` + `curl -sf`, losing that race
+# fails silently (no body, no error text) with the script just exiting
+# after the "Call 1" line, which is exactly what a fresh `docker-compose
+# up -d && ./request.sh` looks like. Same endpoint and pattern
+# .github/workflows/ci.yml waits on before its own requests.
+echo "Waiting for the proxy to be ready..."
+for i in $(seq 1 40); do
+  curl -sf "$PROXY_URL/health/liveliness" >/dev/null 2>&1 && break
+  if [ "$i" -eq 40 ]; then
+    echo "litellm proxy never became healthy at $PROXY_URL -- check 'docker-compose logs litellm'" >&2
+    exit 1
+  fi
+  sleep 1
+done
+echo
+
 echo "--- Ticket ---"
 echo "$TICKET"
 echo

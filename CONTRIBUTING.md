@@ -16,8 +16,12 @@ someone copies just that one folder out of the repo.
    existing template, not novel designs.
 3. Follow the file contract and README spec below exactly.
 4. Make sure it runs end-to-end in local mode (against `local-collector/`)
-   before opening a PR. Harness-mode (real CACM ingestion) is verified
-   manually — see `docs/03-run-locally-first.md` — not part of CI.
+   before opening a PR — every app's `.env.example` ships pointed at
+   `mock-providers/` by default, so this already exercises that path. If
+   the app also supports a free-local-model alternative (currently
+   `1-harness-sdk/openai/` and `3-manual-instrumentation/python/`, via
+   Ollama), test that path too. Harness-mode (real CACM ingestion) is
+   verified manually — see `docs/03-run-locally-first.md` — not part of CI.
 
 ## Per-app file contract
 

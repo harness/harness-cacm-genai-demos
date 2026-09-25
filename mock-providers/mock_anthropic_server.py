@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
-"""Minimal Anthropic-compatible /v1/messages stub, for CI (and local testing
-without an Anthropic API key).
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""Minimal Anthropic-compatible /v1/messages stub.
 
-Stands in for a real Anthropic account so 1-harness-sdk/anthropic/main.py's
-three support-ticket-triage calls can run with no provider credentials.
-Stdlib-only (http.server) so it runs under the system python3, outside any
-app's uv-managed venv -- no dependency on the app's pyproject.toml/uv.lock.
+Stands in for a real Anthropic account so 1-harness-sdk/anthropic/'s and
+1-harness-sdk/litellm/'s three support-ticket-triage calls can run with no
+provider credentials at all -- see each app's README.md
+"Prerequisites"/Setup for how to point it at this server. Also used by
+.github/workflows/ci.yml, unmodified, so this is the exact same stub a
+customer would run locally, not a separate CI-only fixture. Stdlib-only
+(http.server); the PEP 723 block above lets `uv run` execute it in its own
+throwaway environment, independent of any app's pyproject.toml/uv.lock and
+with no separate python3 install needed.
 
 Unlike openai/'s mock (mock_openai_server.py), there's no local runtime
 (Ollama-equivalent) this stands in for -- Anthropic's Messages API has no
 OpenAI-compatible mode to fall back to. This stub exists purely to exercise
 the OTel instrumentation pipeline (spans, gen_ai.* attributes) end to end;
-it proves the plumbing works, not real model output.
+it proves the plumbing works, not real model output or realistic token
+counts. Switch to a real ANTHROPIC_API_KEY once you've confirmed spans show
+up in Jaeger.
 
 Response shape matches the Anthropic Messages API closely enough for
 opentelemetry-instrumentation-anthropic to populate gen_ai.request.model
