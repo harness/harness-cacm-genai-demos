@@ -41,3 +41,9 @@ local-mode path.
 
 If you deliberately want to point a demo at a different local OTLP
 endpoint (e.g. your own collector), just edit that one line in its `.env`.
+
+## Moving on to Harness
+
+This collector is only for local mode. When you're ready to send traces to
+your real Harness account, follow the "Send traces to Harness" section of
+the demo's own `README.md` — spans then go to Harness instead of here.

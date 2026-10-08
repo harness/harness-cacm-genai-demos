@@ -16,7 +16,9 @@ in this repo produced it.
 | `gen_ai.usage.output_tokens` | The completion-side half (usually the pricier side per token) | Span under-costs rather than zero-costs — input-token cost alone still applies. |
 | `gen_ai.agent.name` | Whether this span's cost rolls up under an agent in the per-agent breakdown | Cost still computes correctly; it just only appears in the raw per-service total, not attributed to any agent. |
 
-None of the apps in this repo currently set `gen_ai.usage.total_tokens` —
+None of the Python apps in this repo currently set `gen_ai.usage.total_tokens`
+(the LiteLLM proxy's `litellm_request` span does, but it's not used for
+pricing) —
 Cost Explorer derives total cost from the input/output split above, it
 doesn't need a separate total.
 

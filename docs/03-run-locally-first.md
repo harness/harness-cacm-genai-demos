@@ -97,12 +97,16 @@ point a demo at a real Harness account.
 ## Going from here to a real Harness account
 
 Nothing about switching later requires re-running setup from scratch.
-Every demo's `.env` has exactly two lines to change:
+Every app's own `README.md` has a **"Send traces to Harness"** section
+with the exact steps for that app — start there. In short, you change a
+few lines in the same `.env` you already have and run the app again:
 
-```bash
-TRACE_TARGET=harness
-HARNESS_ACCOUNT_ID=<your account id>
-HARNESS_REPORTING_TOKEN=<your token>
-```
+| App | What you change in `.env` | Then |
+|---|---|---|
+| `1-harness-sdk/*`, `3-manual-instrumentation/python/` | Three lines: `TRACE_TARGET=harness`, `HARNESS_ACCOUNT_ID`, `HARNESS_REPORTING_TOKEN` | `uv run main.py` |
+| [`2-open-source-sdks/litellm-proxy/`](../2-open-source-sdks/litellm-proxy/README.md) | Uncomment three lines: `OTEL_ENDPOINT`, `OTEL_HEADERS`, `OTEL_RESOURCE_ATTRIBUTES` (no `TRACE_TARGET` here) | `docker-compose up -d --force-recreate litellm`, then `./request.sh` |
 
-See `01-get-your-token.md` for how to get those two values.
+In every case, spans go to Harness **instead of** Jaeger, not as well as
+it, so Jaeger showing nothing new afterwards is expected. See
+`01-get-your-token.md` for the account ID, token and cluster host, and
+`02-verify-traces.md` for where the trace shows up.

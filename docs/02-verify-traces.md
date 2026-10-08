@@ -1,9 +1,10 @@
 # Verify your traces in CACM
 
-This page walks through where a demo's spans surface once you've switched
-it to `TRACE_TARGET=harness` (see `01-get-your-token.md`) and run it. If
-you're still in local mode, you want `03-run-locally-first.md` instead —
-this page is CACM-specific.
+This page walks through where a demo's spans surface once you've pointed
+it at your Harness account and run it — i.e. after following the app's own
+"Send traces to Harness" section (which uses `01-get-your-token.md` for
+the credentials). If you're still in local mode, you want
+`03-run-locally-first.md` instead — this page is CACM-specific.
 
 ## Where to look
 
@@ -11,8 +12,9 @@ this page is CACM-specific.
 2. Go to **AI Traces**.
 3. Find the service by the name the demo sent — every demo sets a
    distinct `service.name` (e.g. `cacm-demo-openai`,
-   `cacm-demo-anthropic`, `cacm-demo-manual-python`; each app's own
-   `README.md` "Run" section states its exact value).
+   `cacm-demo-anthropic`, `cacm-demo-manual-python`,
+   `cacm-demo-litellm-proxy`; each app's own `README.md` "Send traces to
+   Harness" section states its exact value).
 4. Open that service's **Service Traces** drawer.
 
 What you see depends on the app: every `1-harness-sdk/*` app sends **one

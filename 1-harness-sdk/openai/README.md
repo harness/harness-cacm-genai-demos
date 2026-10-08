@@ -35,11 +35,11 @@ they land, or `3-manual-instrumentation/python/` for a no-SDK approach.
   `OPENAI_BASE_URL` at a local [Ollama](https://ollama.com) instance
   (`ollama run llama3.2:1b`) for real model output with still no OpenAI
   account, or use a real OpenAI API key for the real API.
-- **Harness mode:** an OpenAI API key (or continue pointing at the mock
-  or Ollama — the provider and the trace target are independent
-  switches), plus a Harness account ID and an ordinary personal/
+- **Harness mode:** a Harness account ID and an ordinary personal/
   service-account token, sent natively as `x-harness-service-token` (see
-  `docs/01-get-your-token.md`).
+  `docs/01-get-your-token.md`). The provider and the trace target are
+  independent switches, so you can keep the mock, Ollama, or a real
+  OpenAI key — see "Send traces to Harness" below.
 
 ## Setup
 
@@ -52,14 +52,8 @@ it first — see "Run" below). To use a local Ollama instance instead (real
 model output, still zero OpenAI account) or a real OpenAI API key, comment
 out the shipped `OPENAI_*` lines in `.env` and uncomment the alternative
 block you want — see `.env.example`'s comments for exactly which lines.
-
-To send traces to a real Harness account instead, edit two lines in `.env`:
-
-```bash
-TRACE_TARGET=harness
-HARNESS_ACCOUNT_ID=<your account id>
-HARNESS_REPORTING_TOKEN=<your token>
-```
+Traces go to local Jaeger as shipped; to send them to your real Harness
+account instead, see "Send traces to Harness" below.
 
 Then install dependencies:
 
@@ -103,7 +97,46 @@ for the disruption.
 ```
 
 Local mode: open http://localhost:16686, find service `cacm-demo-openai`.
-Harness mode: see `docs/02-verify-traces.md` for the Cost Explorer path.
+Once you've seen the trace there, continue to "Send traces to Harness".
+
+## Send traces to Harness
+
+Once the trace looks right in Jaeger, point the same app at your real
+Harness account. Only the trace destination changes — the provider is a
+separate switch, so keep the mock, Ollama, or a real OpenAI key exactly
+as it is.
+
+1. **Get your account ID and a token** — see `docs/01-get-your-token.md`.
+   Also check which cluster your account lives on: the shipped
+   `INGEST_BASE` is `https://prod3.harness.io/udp-ingest`.
+2. **Edit three lines in `.env`** (leave `INGEST_BASE` alone unless your
+   account isn't on `prod3`; `LOCAL_OTLP_ENDPOINT` is ignored in this
+   mode):
+
+   ```bash
+   TRACE_TARGET=harness
+   HARNESS_ACCOUNT_ID=<your account id>
+   HARNESS_REPORTING_TOKEN=<your token>
+   ```
+
+3. **Run it again** — no reinstall needed:
+
+   ```bash
+   uv run main.py
+   ```
+
+   Spans now go to Harness and **not** to Jaeger, so Jaeger showing
+   nothing new for this run is expected.
+4. **Find the trace.** In your Harness account open Cost Explorer → AI
+   Traces and look for service `cacm-demo-openai` — see
+   `docs/02-verify-traces.md` for what you should see. If nothing
+   appears, or you get `403 tenant mismatch`, see
+   `docs/04-troubleshooting.md`.
+
+The mock provider returns fixed token counts (42 in / 8 out), so the
+dollar figures it produces prove the pipeline works but aren't realistic.
+Use a real OpenAI key and model for realistic cost. To go back to local
+mode, set `TRACE_TARGET=local`.
 
 ## What to look for
 

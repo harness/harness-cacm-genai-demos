@@ -21,7 +21,8 @@ someone copies just that one folder out of the repo.
    the app also supports a free-local-model alternative (currently
    `1-harness-sdk/openai/` and `3-manual-instrumentation/python/`, via
    Ollama), test that path too. Harness-mode (real CACM ingestion) is
-   verified manually — see `docs/03-run-locally-first.md` — not part of CI.
+   verified manually by following the app's own "Send traces to Harness"
+   section — not part of CI.
 
 ## Per-app file contract
 
@@ -47,16 +48,17 @@ No extra files, no missing ones — except the documented exceptions below.
 
 ## README spec
 
-Every app's `README.md` has these 8 sections, identical headings, identical order:
+Every app's `README.md` has these 9 sections, identical headings, identical order:
 
 1. **What this shows** — one sentence, plus the exact stack combination.
 2. **Which setup this matches** — "use this if your app does X"; links to the canonical Harness doc page.
 3. **Prerequisites** — Python version, `uv`, which provider key, whether a Harness token is needed (not needed in local mode).
-4. **Setup** — `cp .env.example .env`, edit two lines, `uv sync`.
+4. **Setup** — `cp .env.example .env`, provider choice, `uv sync`. Local mode only; no Harness config here.
 5. **Run** — the run command, plus verbatim expected console output.
-6. **What to look for** — table of exact span name + `gen_ai.*` attributes this app produces, and where they surface in Cost Explorer.
-7. **How it works** — only the 3–5 lines that do the instrumenting. Nothing about the demo's business logic.
-8. **Adapt this to your app** — what to change, what must not move.
+6. **Send traces to Harness** — the numbered steps to move from the verified local run to a real Harness account: get the account ID/token (`docs/01-get-your-token.md`), the exact `.env` lines to change, how to re-run (including any container recreate), where the trace shows up (`docs/02-verify-traces.md`, `docs/04-troubleshooting.md`), and how to switch back. State that the provider and trace target are independent switches, and that the mock's fixed token counts give unrealistic cost.
+7. **What to look for** — table of exact span name + `gen_ai.*` attributes this app produces, and where they surface in Cost Explorer.
+8. **How it works** — only the 3–5 lines that do the instrumenting. Nothing about the demo's business logic.
+9. **Adapt this to your app** — what to change, what must not move.
 
 ## `main.py` structure
 
@@ -92,7 +94,8 @@ STEP 6 — Flush before exit
 ## Before opening a PR
 
 - [ ] File set matches the contract above exactly (exceptions table respected)
-- [ ] `README.md` has all 8 sections, in order
+- [ ] `README.md` has all 9 sections, in order, including "Send traces to Harness"
+- [ ] The "Send traces to Harness" steps were followed as written, end to end, against a real account (or the PR says why not)
 - [ ] `uv sync --locked` succeeds and the app runs against a local Jaeger
 - [ ] No secrets, tokens, or internal references committed
 - [ ] No sample code sends any credential other than `x-harness-service-token` /

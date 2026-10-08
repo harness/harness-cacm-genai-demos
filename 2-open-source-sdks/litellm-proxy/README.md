@@ -45,8 +45,9 @@ distinction from this one.
   real token counts), get an API key and see "Setup" below.
 - **Harness mode:** a Harness account ID and an ordinary personal/
   service-account token, sent as `x-harness-service-token` (see
-  `docs/01-get-your-token.md`), in addition to a real OpenAI key (the
-  mock only proves the plumbing works — see `mock-providers/README.md`).
+  `docs/01-get-your-token.md`). The provider and the trace target are
+  independent switches, so you can keep the mock or use a real OpenAI
+  key — see "Send traces to Harness" below.
 
 ## Setup
 
@@ -58,10 +59,8 @@ Local mode works with the file as shipped against the mock server (start
 it first — see "Run" below). To use a real OpenAI account instead, comment
 out `OPENAI_API_BASE` and put a real key in `OPENAI_API_KEY` (see
 `.env.example`'s comment on why commenting the line out, not blanking it,
-matters). To also send traces to a real Harness account, uncomment and
-fill in the three `OTEL_*` lines at the bottom of `.env` instead of
-editing `docker-compose.yaml` or `config.yaml` — see `.env.example`'s
-comments for exactly which three.
+matters). Traces go to the bundled Jaeger as shipped; to send them to your
+real Harness account instead, see "Send traces to Harness" below.
 
 ## Run
 
@@ -118,10 +117,64 @@ both the mock's fixed line, `This is a stubbed CI response for the demo
 scenario.` — expected; it proves the trace pipeline works, not the model.
 
 Local mode: open http://localhost:16686, find service
-`cacm-demo-litellm-proxy`. Harness mode: see `docs/02-verify-traces.md`
-for the Cost Explorer path.
+`cacm-demo-litellm-proxy`. Once you've seen the trace there, continue to
+"Send traces to Harness".
 
 Stop the proxy and its bundled Jaeger with `docker-compose down`.
+
+## Send traces to Harness
+
+Once the trace looks right in Jaeger, point the same proxy at your real
+Harness account. Only the trace destination changes — the provider is a
+separate switch, so keep the mock (leave `mock_openai_server.py`
+running) or your real OpenAI key exactly as it is. There's nothing to
+edit in `docker-compose.yaml` or `config.yaml`.
+
+1. **Get your account ID and a token** — see `docs/01-get-your-token.md`.
+   Also check which cluster your account lives on.
+2. **Uncomment and fill in the three `OTEL_*` lines** at the bottom of
+   `.env`:
+
+   ```bash
+   OTEL_ENDPOINT=https://prod3.harness.io/udp-ingest/otel
+   OTEL_HEADERS=x-harness-service-token=<TOKEN>,x-tenant-id=<ACCOUNT_ID>
+   OTEL_RESOURCE_ATTRIBUTES=harness.account.id=<ACCOUNT_ID>,service.name=cacm-demo-litellm-proxy
+   ```
+
+   - If your account isn't on `prod3`, swap the host using the cluster
+     table in `docs/01-get-your-token.md`, keeping the `/udp-ingest/otel`
+     path. Don't add `/v1/traces` or `?accountIdentifier=…` to it — the
+     proxy appends `/v1/traces` itself.
+   - `<ACCOUNT_ID>` appears twice and must be the same account the token
+     belongs to, or ingestion fails with `403 tenant mismatch`.
+   - Keep `service.name` in the same line as `harness.account.id`: this
+     variable is the only place both are set.
+3. **Recreate the proxy container** so it picks up the new values. A
+   plain restart does not re-read `.env`:
+
+   ```bash
+   docker-compose up -d --force-recreate litellm
+   ```
+
+4. **Send the requests again:**
+
+   ```bash
+   ./request.sh
+   ```
+
+   Spans now go to Harness and **not** to the bundled Jaeger, so Jaeger
+   showing nothing new for this run is expected.
+5. **Find the trace.** In your Harness account open Cost Explorer → AI
+   Traces and look for service `cacm-demo-litellm-proxy` — see
+   `docs/02-verify-traces.md` for what you should see (21 spans, 2 of
+   them with `gen_ai.*` data; see "What to look for" below). If nothing
+   appears, or you get `403 tenant mismatch`, see
+   `docs/04-troubleshooting.md`.
+
+The mock provider returns fixed token counts (42 in / 8 out), so the
+dollar figures it produces prove the pipeline works but aren't realistic.
+Use a real OpenAI key for realistic cost. To go back to local mode,
+comment the three lines out again and re-run step 3.
 
 ## What to look for
 

@@ -1,8 +1,10 @@
 # Get your token
 
-Every demo in this repo defaults to `TRACE_TARGET=local` and needs none of
-this. Read this page only when you're ready to switch a demo to
-`TRACE_TARGET=harness` and send traces to your real Harness account.
+Every demo in this repo defaults to local Jaeger and needs none of this.
+Read this page when you're ready to send traces to your real Harness
+account — each app's own `README.md` "Send traces to Harness" section
+links here for the account ID, token and cluster host, then gives the
+exact steps for that app.
 
 ## What you need
 
@@ -14,6 +16,12 @@ account ID" below:
 | Account ID | Your Harness account settings | `HARNESS_ACCOUNT_ID` |
 | API token | A personal access token (PAT) or service account token (SAT), scoped to that account | `HARNESS_REPORTING_TOKEN` |
 | Ingest base URL | The cluster your account lives on (table below) | `INGEST_BASE` |
+
+The `.env` variable names above apply to the Python apps. For
+[`2-open-source-sdks/litellm-proxy/`](../2-open-source-sdks/litellm-proxy/README.md),
+which has no `main.py` to assemble them, the same three values go into
+`OTEL_ENDPOINT`, `OTEL_HEADERS` and `OTEL_RESOURCE_ATTRIBUTES` instead —
+see that README's "Send traces to Harness".
 
 Create the token from **Account Settings → My API Keys** (personal token)
 or **Account Settings → Service Accounts** (service account token). Either
@@ -41,7 +49,10 @@ closed (auth error), it doesn't silently land somewhere else.
 
 ## Why one account ID, not four
 
-Every demo sends the account ID in four different places on the wire:
+Every Python demo sends the account ID in four different places on the
+wire (`litellm-proxy/` sends two of them — the `x-tenant-id` header and
+the `harness.account.id` resource attribute — since its endpoint can't
+carry query params):
 
 1. `x-tenant-id` header
 2. `accountIdentifier` query param
@@ -78,9 +89,10 @@ has been corrected.
 
 ## Once you have all three values
 
-Edit two lines in the demo's `.env` (the third, `INGEST_BASE`, already
-ships with a sensible default — change it only if your account isn't on
-that cluster):
+Go to the demo's own `README.md` and follow its **"Send traces to
+Harness"** section. For the Python apps that means editing three lines in
+`.env` (`INGEST_BASE` already ships with a sensible default — change it
+only if your account isn't on that cluster):
 
 ```bash
 TRACE_TARGET=harness
@@ -88,5 +100,5 @@ HARNESS_ACCOUNT_ID=<your account id>
 HARNESS_REPORTING_TOKEN=<your token>
 ```
 
-Then run the demo as its own `README.md` describes, and see
-`02-verify-traces.md` for where the resulting trace shows up in CACM.
+then running the demo again. See `02-verify-traces.md` for where the
+resulting trace shows up in CACM.

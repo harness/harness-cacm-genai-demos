@@ -42,9 +42,13 @@ docker-compose up -d
 ```
 
 See `local-collector/README.md` for why the ports aren't the OTel
-defaults. To send traces to your real Harness account instead, see
-`docs/01-get-your-token.md`; each demo's `.env.example` documents the two
-lines you need to change.
+defaults. (`2-open-source-sdks/litellm-proxy/` bundles its own Jaeger and
+doesn't need this step.)
+
+Once you've seen a trace locally, every demo's `README.md` has a **"Send
+traces to Harness"** section with the exact steps for that app — the few
+`.env` lines to change, how to re-run, and where to find the trace. Get
+your account ID and token from `docs/01-get-your-token.md` first.
 
 Most demos also need a real provider account. None of them require one by
 default: every `1-harness-sdk/`/`3-manual-instrumentation/python/`/
@@ -59,9 +63,11 @@ each demo's own `README.md` "Prerequisites" for which paths apply.
 
 Copy the one folder matching your stack from the table above out of this
 repo (or just `cd` into it here) and follow its own `README.md` — every
-demo is self-contained: `cp .env.example .env`, edit two lines, `uv sync`,
-then run. View traces at http://localhost:16686 in local mode, or in
-CACM's Cost Explorer once pointed at a real account.
+demo is self-contained: `cp .env.example .env`, `uv sync`, then run (the
+LiteLLM proxy uses `docker-compose up -d` and `./request.sh` instead). View
+traces at http://localhost:16686 in local mode. When that works, follow the
+demo's "Send traces to Harness" section to see them in CACM's Cost
+Explorer.
 
 ## Documentation
 
@@ -69,11 +75,14 @@ Deeper walkthroughs that apply across every demo live in
 [`docs/`](docs/):
 
 - [`docs/01-get-your-token.md`](docs/01-get-your-token.md) — service
-  account → API key → token, account ID, cluster host
+  account → API key → token, account ID, cluster host (step 1 of every
+  demo's "Send traces to Harness")
 - [`docs/02-verify-traces.md`](docs/02-verify-traces.md) — confirming
-  traces landed in Cost Explorer
+  traces landed in Cost Explorer (the last step of "Send traces to
+  Harness")
 - [`docs/03-run-locally-first.md`](docs/03-run-locally-first.md) — the
-  Jaeger path, no Harness account needed
+  Jaeger path, no Harness account needed, plus a one-table summary of how
+  each app switches to Harness
 - [`docs/04-troubleshooting.md`](docs/04-troubleshooting.md) — a
   symptom-keyed "no spans appeared" decision tree
 - [`docs/05-what-drives-cost.md`](docs/05-what-drives-cost.md) — which

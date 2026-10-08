@@ -41,8 +41,9 @@ instead.
   get an API key and see "Setup" below.
 - **Harness mode:** a Harness account ID and an ordinary personal/
   service-account token, sent natively as `x-harness-service-token` (see
-  `docs/01-get-your-token.md`), in addition to a real Anthropic key (the
-  mock only proves the plumbing works — see `mock-providers/README.md`).
+  `docs/01-get-your-token.md`). The provider and the trace target are
+  independent switches, so you can keep the mock or use a real Anthropic
+  key — see "Send traces to Harness" below.
 
 ## Setup
 
@@ -52,14 +53,9 @@ cp .env.example .env
 
 Local mode works with the file as shipped against the mock server (start
 it first — see "Run" below). To use the real Anthropic API instead, clear
-`LITELLM_API_BASE` and put a real key in `ANTHROPIC_API_KEY`. To also send
-traces to a real Harness account, edit two more lines:
-
-```bash
-TRACE_TARGET=harness
-HARNESS_ACCOUNT_ID=<your account id>
-HARNESS_REPORTING_TOKEN=<your token>
-```
+`LITELLM_API_BASE` and put a real key in `ANTHROPIC_API_KEY`. Traces go
+to local Jaeger as shipped; to send them to your real Harness account
+instead, see "Send traces to Harness" below.
 
 Then install dependencies:
 
@@ -108,7 +104,46 @@ both the mock's fixed line, `This is a stubbed CI response for the demo
 scenario.` — expected; it proves the trace pipeline works, not the model.
 
 Local mode: open http://localhost:16686, find service `cacm-demo-litellm`.
-Harness mode: see `docs/02-verify-traces.md` for the Cost Explorer path.
+Once you've seen the trace there, continue to "Send traces to Harness".
+
+## Send traces to Harness
+
+Once the trace looks right in Jaeger, point the same app at your real
+Harness account. Only the trace destination changes — the provider is a
+separate switch, so keep the mock or your real Anthropic key exactly as
+it is.
+
+1. **Get your account ID and a token** — see `docs/01-get-your-token.md`.
+   Also check which cluster your account lives on: the shipped
+   `INGEST_BASE` is `https://prod3.harness.io/udp-ingest`.
+2. **Edit three lines in `.env`** (leave `INGEST_BASE` alone unless your
+   account isn't on `prod3`; `LOCAL_OTLP_ENDPOINT` is ignored in this
+   mode):
+
+   ```bash
+   TRACE_TARGET=harness
+   HARNESS_ACCOUNT_ID=<your account id>
+   HARNESS_REPORTING_TOKEN=<your token>
+   ```
+
+3. **Run it again** — no reinstall needed:
+
+   ```bash
+   uv run main.py
+   ```
+
+   Spans now go to Harness and **not** to Jaeger, so Jaeger showing
+   nothing new for this run is expected.
+4. **Find the trace.** In your Harness account open Cost Explorer → AI
+   Traces and look for service `cacm-demo-litellm` — see
+   `docs/02-verify-traces.md` for what you should see. If nothing
+   appears, or you get `403 tenant mismatch`, see
+   `docs/04-troubleshooting.md`.
+
+The mock provider returns fixed token counts (42 in / 8 out), so the
+dollar figures it produces prove the pipeline works but aren't realistic.
+Use a real Anthropic key for realistic cost. To go back to local mode,
+set `TRACE_TARGET=local`.
 
 ## What to look for
 

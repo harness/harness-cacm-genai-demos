@@ -54,6 +54,23 @@ Work through these in order:
    explicit flush call (STEP 6) for exactly this reason — if you removed
    or commented it out while adapting a demo, put it back.
 
+## Symptom: I switched to Harness, and now Jaeger shows nothing new
+
+Expected, not a bug. Sending to Harness **replaces** the local export, it
+doesn't add to it. Check Cost Explorer → AI Traces instead (see
+`02-verify-traces.md`), or switch back to local mode to see Jaeger again.
+
+## Symptom: I edited `.env` for Harness, but the traces still go to Jaeger
+
+- **Python apps:** confirm `TRACE_TARGET=harness` (not `local`) and that
+  you saved `.env` in the app's own folder — `.env` is per app, not
+  shared.
+- **`2-open-source-sdks/litellm-proxy/`:** the container reads `.env` when
+  it's created, so a restart or an unchanged `docker-compose up -d` can
+  keep the old values. Run `docker-compose up -d --force-recreate
+  litellm`, then `./request.sh` again. Also confirm the three `OTEL_*`
+  lines are uncommented.
+
 ## Symptom: spans show up on stdout, but nothing reaches Jaeger or CACM
 
 `HARNESS_ENABLE_CONSOLE_SPAN_EXPORTER=true` **replaces** OTLP export, it
